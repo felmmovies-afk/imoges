@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>رفع الصور بجودة فائقة | Instant Image Host</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts - Tajawal -->
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#ecfdf5',
+                            100: '#d1fae5',
+                            500: '#10b981',
+                            600: '#059669',
+                            700: '#047857',
+                            900: '#064e3b'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Tajawal', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Tajawal', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            min-height: 100vh;
+        }
+        .glass {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .drag-active {
+            border-color: #10b981 !important;
+            background-color: rgba(16, 185, 129, 0.08) !important;
+        }
+    </style>
+</head>
+<body class="text-slate-100 p-4 md:p-8 flex flex-col justify-between">
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 transform -translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+        <div class="bg-brand-600 text-white px-6 py-3 rounded-xl shadow-2xl flex items-center space-x-3 space-x-reverse font-bold text-sm">
+            <i class="fa-solid fa-circle-check text-lg"></i>
+            <span id="toast-message">تم النسخ بنجاح!</span>
+        </div>
+    </div>
+
+    <div class="max-w-4xl mx-auto w-full">
+        <!-- Header -->
+        <header class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-16 h-16 bg-brand-500/20 text-brand-500 rounded-2xl mb-4 border border-brand-500/30 shadow-lg shadow-brand-500/10">
+                <i class="fa-solid fa-cloud-arrow-up text-3xl"></i>
+            </div>
+            <h1 class="text-3xl md:text-4xl font-extrabold text-white tracking-wide mb-2">مراكز رفع الصور للجودة الأصلية</h1>
+            <p class="text-slate-400 text-sm md:text-base max-w-lg mx-auto">
+                احصل على رابط مباشر وحصري لصورك بدون أي ضغط أو تقليل للألوان والجودة عند المشاركة عبر منصات التواصل الاجتماعي.
+            </p>
+        </header>
+
+        <!-- Main Upload Area -->
+        <main class="space-y-6">
+            <div class="glass rounded-3xl p-6 md:p-8 shadow-2xl transition-all">
+                <!-- Dropzone -->
+                <div id="dropzone" class="border-2 border-dashed border-slate-600 hover:border-brand-500 rounded-2xl p-8 md:p-12 text-center cursor-pointer transition-all duration-200 bg-slate-800/40 hover:bg-slate-800/80 flex flex-col items-center justify-center group">
+                    <input type="file" id="file-input" accept="image/*" class="hidden" />
+                    
+                    <div class="w-20 h-20 bg-slate-700/50 group-hover:bg-brand-500/20 text-slate-300 group-hover:text-brand-500 rounded-full flex items-center justify-center mb-4 transition-all duration-300">
+                        <i class="fa-solid fa-image text-4xl"></i>
+                    </div>
+
+                    <h3 class="text-lg font-bold text-slate-200 mb-1">اسحب الصورة وأسقطها هنا</h3>
+                    <p class="text-xs text-slate-400 mb-4">أو انقر هنا لاختيار الصورة من جهازك (JPG, PNG, GIF, WEBP)</p>
+
+                    <button type="button" class="bg-brand-600 hover:bg-brand-500 text-white font-bold px-6 py-2.5 rounded-xl shadow-lg transition-all duration-200 text-sm flex items-center gap-2">
+                        <i class="fa-solid fa-file-image"></i>
+                        اختر صورة
+                    </button>
+                </div>
+
+                <!-- Preview & Progress Area (Hidden by default) -->
+                <div id="preview-area" class="hidden mt-6 space-y-4">
+                    <div class="flex flex-col md:flex-row items-center gap-6 bg-slate-800/80 p-4 rounded-2xl border border-slate-700/60">
+                        <div class="w-full md:w-36 h-36 rounded-xl overflow-hidden bg-slate-900 border border-slate-700 flex items-center justify-center shrink-0">
+                            <img id="image-preview" src="" alt="المعاينة" class="w-full h-full object-contain">
+                        </div>
+
+                        <div class="flex-1 w-full space-y-2">
+                            <div class="flex justify-between items-center text-sm">
+                                <span id="file-name" class="font-bold text-white truncate max-w-[200px] md:max-w-[300px]">image.png</span>
+                                <span id="file-size" class="text-slate-400 text-xs">0 KB</span>
+                            </div>
+
+                            <!-- Specs info -->
+                            <div id="file-dimensions" class="text-xs text-brand-500 font-medium">
+                                جودة أصلية 100% بدون أي تعديل
+                            </div>
+
+                            <!-- Progress bar -->
+                            <div id="progress-container" class="w-full bg-slate-700 h-2 rounded-full overflow-hidden mt-3">
+                                <div id="progress-bar" class="bg-brand-500 h-full w-0 transition-all duration-300"></div>
+                            </div>
+
+                            <p id="upload-status" class="text-xs text-slate-400">جاري التجهيز...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Result Direct Link Box (Hidden by default) -->
+                <div id="result-box" class="hidden mt-6 space-y-4 bg-slate-900/90 p-5 rounded-2xl border border-brand-500/30">
+                    <div class="flex items-center justify-between text-brand-500 font-bold text-sm mb-2">
+                        <span class="flex items-center gap-2">
+                            <i class="fa-solid fa-link text-lg"></i>
+                            الرابط المباشر للفيلم/الصورة (جاهز للمشاركة)
+                        </span>
+                        <span class="text-xs bg-brand-500/20 text-brand-500 px-2.5 py-1 rounded-full border border-brand-500/30">جودة كاملة</span>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <input id="direct-link" type="text" readonly class="w-full bg-slate-800 border border-slate-700 text-slate-200 px-4 py-3 rounded-xl font-mono text-xs md:text-sm focus:outline-none focus:border-brand-500 select-all" dir="ltr" />
+                        
+                        <button id="copy-btn" onclick="copyLink()" class="bg-brand-600 hover:bg-brand-500 text-white font-bold px-5 py-3 rounded-xl transition-all flex items-center gap-2 shrink-0 text-sm">
+                            <i class="fa-regular fa-copy"></i>
+                            نسخ الرابط
+                        </button>
+                    </div>
+
+                    <!-- Embed Codes Options -->
+                    <div class="pt-2 border-t border-slate-800 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                        <div>
+                            <label class="text-slate-400 mb-1 block">كود HTML للمواقع:</label>
+                            <div class="flex gap-2">
+                                <input id="html-code" readonly type="text" class="w-full bg-slate-800/80 border border-slate-700/60 text-slate-300 p-2 rounded-lg font-mono text-[11px]" dir="ltr">
+                                <button onclick="copyElementText('html-code')" class="bg-slate-700 hover:bg-slate-600 px-3 rounded-lg"><i class="fa-regular fa-copy"></i></button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-slate-400 mb-1 block">كود Markdown:</label>
+                            <div class="flex gap-2">
+                                <input id="md-code" readonly type="text" class="w-full bg-slate-800/80 border border-slate-700/60 text-slate-300 p-2 rounded-lg font-mono text-[11px]" dir="ltr">
+                                <button onclick="copyElementText('md-code')" class="bg-slate-700 hover:bg-slate-600 px-3 rounded-lg"><i class="fa-regular fa-copy"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Upload History Section -->
+            <div class="glass rounded-3xl p-6 md:p-8 shadow-xl">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-clock-rotate-left text-brand-500"></i>
+                        سجل الصور المرفوعة مؤخراً
+                    </h2>
+                    <button onclick="clearHistory()" class="text-xs text-red-400 hover:text-red-300 flex items-center gap-1">
+                        <i class="fa-solid fa-trash"></i>
+                        مسح السجل
+                    </button>
+                </div>
+
+                <div id="history-list" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                    <!-- History Cards inserted dynamically -->
+                </div>
+                <div id="empty-history" class="text-center py-8 text-slate-500 text-sm">
+                    لا توجد صور مرفوعة في السجل حالياً.
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="mt-8 text-center text-xs text-slate-500 space-y-2">
+            <p>يتم حفظ جميع الصور بجودتها الخام الأصلية 100% بدون أي ضغط متقدم.</p>
+            <p class="font-mono text-slate-600">Supabase Storage Integrated • Project: images</p>
+        </footer>
+    </div>
+
+    <!-- Script Application Logic -->
+    <script>
+        // Supabase Configuration from your credentials
+        const SUPABASE_URL = "https://xeztdsvvwougeomkkdlc.supabase.co";
+        const SUPABASE_KEY = "sb_publishable_wseTa_SzLMLSFPoJSVTQhg_mqxOJxGt"; // Anon/Publishable Key
+        const BUCKET_NAME = "images";
+
+        // Initialize Supabase Client
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // UI Elements
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('file-input');
+        const previewArea = document.getElementById('preview-area');
+        const imagePreview = document.getElementById('image-preview');
+        const fileNameEl = document.getElementById('file-name');
+        const fileSizeEl = document.getElementById('file-size');
+        const progressBar = document.getElementById('progress-bar');
+        const uploadStatus = document.getElementById('upload-status');
+        const resultBox = document.getElementById('result-box');
+        const directLinkInput = document.getElementById('direct-link');
+        const htmlCodeInput = document.getElementById('html-code');
+        const mdCodeInput = document.getElementById('md-code');
+        const historyList = document.getElementById('history-list');
+        const emptyHistory = document.getElementById('empty-history');
+
+        // Drag & Drop Handling
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropzone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropzone.classList.add('drag-active');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropzone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropzone.classList.remove('drag-active');
+            }, false);
+        });
+
+        dropzone.addEventListener('click', () => fileInput.click());
+
+        dropzone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length > 0) {
+                handleFileSelect(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFileSelect(e.target.files[0]);
+            }
+        });
+
+        // Main Upload Function
+        async function handleFileSelect(file) {
+            if (!file.type.startsWith('image/')) {
+                showToast('يرجى اختيار ملف صورة صالح فقط (PNG, JPG, WEBP, etc.)');
+                return;
+            }
+
+            // Display preview UI
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                imagePreview.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+
+            fileNameEl.textContent = file.name;
+            fileSizeEl.textContent = formatBytes(file.size);
+            
+            previewArea.classList.remove('hidden');
+            resultBox.classList.add('hidden');
+            progressBar.style.width = '20%';
+            uploadStatus.textContent = 'جاري الرفع على السيرفر بضمان الجودة الفائقة...';
+
+            try {
+                // Generate unique filename preserving original extension
+                const ext = file.name.split('.').pop();
+                const cleanFileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
+                const filePath = `${cleanFileName}`;
+
+                progressBar.style.width = '60%';
+
+                // Upload directly to Supabase Storage with original file mime type
+                const { data, error } = await supabaseClient.storage
+                    .from(BUCKET_NAME)
+                    .upload(filePath, file, {
+                        cacheControl: '3600',
+                        upsert: false,
+                        contentType: file.type
+                    });
+
+                if (error) throw error;
+
+                progressBar.style.width = '100%';
+                uploadStatus.textContent = 'تم الرفع بنجاح واستخراج الرابط!';
+
+                // Get Public URL
+                const { data: publicUrlData } = supabaseClient.storage
+                    .from(BUCKET_NAME)
+                    .getPublicUrl(filePath);
+
+                const directUrl = publicUrlData.publicUrl;
+
+                // Show Results
+                setTimeout(() => {
+                    directLinkInput.value = directUrl;
+                    htmlCodeInput.value = `<img src="${directUrl}" alt="Uploaded Image">`;
+                    mdCodeInput.value = `![Image](${directUrl})`;
+
+                    resultBox.classList.remove('hidden');
+                    
+                    // Add to Local Storage History
+                    saveToHistory({
+                        url: directUrl,
+                        name: file.name,
+                        size: formatBytes(file.size),
+                        time: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
+                    });
+
+                    showToast('تم رفع الصورة بنجاح وتوليد الرابط المباشر!');
+                }, 300);
+
+            } catch (err) {
+                console.error(err);
+                progressBar.style.width = '0%';
+                uploadStatus.textContent = 'حدث خطأ أثناء الرفع: ' + (err.message || 'يرجى التحقق من السياسات Storage');
+                showToast('خطأ في الرفع! تحقق من الإعدادات.');
+            }
+        }
+
+        // Helper: Format Bytes
+        function formatBytes(bytes, decimals = 2) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+        }
+
+        // Copy Link Handler
+        function copyLink() {
+            directLinkInput.select();
+            document.execCommand('copy');
+            showToast('تم نسخ الرابط المباشر بنجاح!');
+        }
+
+        function copyElementText(id) {
+            const el = document.getElementById(id);
+            el.select();
+            document.execCommand('copy');
+            showToast('تم النسخ للحافظة!');
+        }
+
+        // Toast Notification
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-message').textContent = msg;
+            toast.classList.remove('opacity-0', '-translate-y-20');
+            toast.classList.add('opacity-100', 'translate-y-0');
+
+            setTimeout(() => {
+                toast.classList.remove('opacity-100', 'translate-y-0');
+                toast.classList.add('opacity-0', '-translate-y-20');
+            }, 3000);
+        }
+
+        // Local Storage History Logic
+        function getHistory() {
+            return JSON.parse(localStorage.getItem('supabase_upload_history') || '[]');
+        }
+
+        function saveToHistory(item) {
+            const history = getHistory();
+            history.unshift(item);
+            if (history.length > 20) history.pop(); // Keep last 20
+            localStorage.setItem('supabase_upload_history', JSON.stringify(history));
+            renderHistory();
+        }
+
+        function clearHistory() {
+            localStorage.removeItem('supabase_upload_history');
+            renderHistory();
+            showToast('تم مسح السجل المحلي');
+        }
+
+        function renderHistory() {
+            const history = getHistory();
+            historyList.innerHTML = '';
+
+            if (history.length === 0) {
+                emptyHistory.classList.remove('hidden');
+                return;
+            }
+
+            emptyHistory.classList.add('hidden');
+
+            history.forEach((item) => {
+                const card = document.createElement('div');
+                card.className = 'group relative bg-slate-800/90 rounded-2xl border border-slate-700/60 overflow-hidden flex flex-col justify-between p-2.5 transition-all hover:border-brand-500/50 hover:shadow-lg';
+                card.innerHTML = `
+                    <div class="h-28 rounded-xl overflow-hidden bg-slate-900 border border-slate-800 mb-2 relative">
+                        <img src="${item.url}" alt="${item.name}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy">
+                        <a href="${item.url}" target="_blank" class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity">
+                            <i class="fa-solid fa-up-right-from-square"></i>
+                        </a>
+                    </div>
+                    <div class="px-1 mb-2">
+                        <p class="text-xs font-bold text-slate-200 truncate" title="${item.name}">${item.name}</p>
+                        <p class="text-[10px] text-slate-400">${item.size} • ${item.time}</p>
+                    </div>
+                    <button onclick="copyToClipboard('${item.url}')" class="w-full bg-slate-700 hover:bg-brand-600 text-white text-xs py-1.5 rounded-lg font-medium transition-colors flex items-center justify-center gap-1">
+                        <i class="fa-regular fa-copy"></i>
+                        نسخ الرابط
+                    </button>
+                `;
+                historyList.appendChild(card);
+            });
+        }
+
+        function copyToClipboard(text) {
+            const dummy = document.createElement('input');
+            document.body.appendChild(dummy);
+            dummy.value = text;
+            dummy.select();
+            document.execCommand('copy');
+            document.body.removeChild(dummy);
+            showToast('تم نسخ الرابط من السجل!');
+        }
+
+        // Initialize History on Load
+        window.onload = function() {
+            renderHistory();
+        };
+    </script>
+</body>
+  </html>
